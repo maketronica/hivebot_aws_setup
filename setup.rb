@@ -9,54 +9,35 @@ Aws.config.update({
   credentials: Aws::Credentials.new(config['aws']['key_id'], config['aws']['secret'])
 })
 
-################################################
-#api_client = Aws::APIGateway::Client.new(region: config['aws']['region'])
-#resp = api_client.get_rest_apis()
-#rest_api = resp.items.detect {|i| i.name == 'Foo' }
-#resources = api_client.get_resources(
-#  rest_api_id: rest_api.id
-#).items
-#puts resources.inspect
-#die
-################################################
+dynamodb = Aws::DynamoDB::Client.new(region: config['aws']['region'])
 
-
-
-#dynamodb = Aws::DynamoDB::Client.new(region: config['aws']['region'])
-
-#resp = dynamodb.create_table({
-#  table_name: 'beta_hivebot_datapoints',
-#  attribute_definitions: [
-#    {
-#      attribute_name: 'hive_id',
-#      attribute_type: 'N'
-#    },
-#    {
-#      attribute_name: 'created_at',
-#      attribute_type: 'N'
-#    }
-#  ],
-#  key_schema: [
-#    {
-#      attribute_name: 'hive_id',
-#      key_type: 'HASH'
-#    },
-#    {
-#      attribute_name: 'created_at',
-#      key_type: 'RANGE'
-#    }
-#  ],
-#  provisioned_throughput: {
-#    read_capacity_units: 1,
-#    write_capacity_units: 1,
-#  }
-#})
-
-#Zip::InputStream.open(StringIO.new(zip)) do |io|
-#  while (entry = io.get_next_entry)
-#    puts "#{entry.name}: '#{io.read}'"
-#  end
-#end
+resp = dynamodb.create_table({
+  table_name: 'beta_hivebot_datapoints',
+  attribute_definitions: [
+    {
+      attribute_name: 'hive_id',
+      attribute_type: 'N'
+    },
+    {
+      attribute_name: 'created_at',
+      attribute_type: 'N'
+    }
+  ],
+  key_schema: [
+    {
+      attribute_name: 'hive_id',
+      key_type: 'HASH'
+    },
+    {
+      attribute_name: 'created_at',
+      key_type: 'RANGE'
+    }
+  ],
+  provisioned_throughput: {
+    read_capacity_units: 1,
+    write_capacity_units: 1,
+  }
+})
 
 iam_client = Aws::IAM::Client.new(region: 'us-west-2')
 

@@ -1,7 +1,0 @@
-aws:
-  key_id: 'AKIAI4OEAFTLVBKG6CUA'
-  secret: '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'
-  #key_id: 'AKIAILZWBXMN3AQHKCLQ'
-  #secret: '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'
-  region: 'us-west-2'
-  #iam_role_with_dynamodb_read_write_arn: 'arn:aws:iam::740535383141:role/FooxRole'
