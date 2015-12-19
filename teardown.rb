@@ -8,9 +8,11 @@ Aws.config.update({
   credentials: Aws::Credentials.new(config['aws']['key_id'], config['aws']['secret'])
 })
 
-#dynamodb = Aws::DynamoDB::Client.new(region: config['aws']['region'])
-#resp = dynamodb.delete_table({ table_name: 'beta_hivebot_datapoints' })
-#puts resp.inspect
+dynamodb = Aws::DynamoDB::Client.new(region: config['aws']['region'])
+begin
+  dynamodb.delete_table({ table_name: 'beta_hivebot_datapoints' })
+rescue
+end
 
 iam_client = Aws::IAM::Client.new(region: 'us-west-2')
 
@@ -31,7 +33,7 @@ exec_policy = response.policies.detect {|p| p.policy_name == 'BetaAPIGatewayLamb
 if exec_policy
   begin
     iam_client.detach_role_policy(
-      role_name: 'BetaAPIGatewayLambdaExecRole',
+      role_name: 'BetaManualLambdaExecRole',
       policy_arn: exec_policy.arn
     )
   rescue

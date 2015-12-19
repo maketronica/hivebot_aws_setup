@@ -69,10 +69,14 @@ lambda_exec_policy = iam_client.create_policy(
   "Statement": [
     {
       "Action": [
-        "logs:*"
+        "logs:*",
+        "dynamodb:Query"
       ],
       "Effect": "Allow",
-      "Resource": "arn:aws:logs:*:*:*"
+      "Resource": [
+        "arn:aws:logs:*:*:*",
+        "arn:aws:dynamodb:*"
+      ]
     }
   ]
 }
@@ -98,28 +102,36 @@ lambda_invoke_role = iam_client.create_role(
 eos
 ).role
 
-lambda_exec_role = iam_client.create_role(
-  role_name: "BetaAPIGatewayLambdaExecRole",
-  assume_role_policy_document: <<eos
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "lambda.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-eos
+#lambda_exec_role = iam_client.create_role(
+#  role_name: "BetaAPIGatewayLambdaExecRole",
+#  assume_role_policy_document: <<eos
+#{
+#  "Version": "2012-10-17",
+#  "Statement": [
+#    {
+#      "Effect": "Allow",
+#      "Principal": {
+#        "Service": "lambda.amazonaws.com"
+#      },
+#      "Action": "sts:AssumeRole"
+#    }
+#  ]
+#}
+#eos
+#).role
+
+lambda_exec_role = iam_client.get_role(
+  role_name: 'BetaManualLambdaExecRole'
 ).role
 
 iam_client.attach_role_policy(
   role_name: lambda_invoke_role.role_name,
   policy_arn: lambda_invoke_policy.arn
+)
+
+iam_client.attach_role_policy(
+  role_name: lambda_exec_role.role_name,
+  policy_arn: lambda_exec_policy.arn
 )
 
 lambda_zip = Zip::OutputStream.write_buffer do |zio|
@@ -136,6 +148,7 @@ if (response.functions.any? {|function| function.function_name == 'BetaHelloWorl
     zip_file: lambda_zip.string
   })
 else
+  sleep 5; #wait for role to propogate
   lambda_client.create_function({
     function_name: 'BetaHelloWorld',
     runtime: 'nodejs',

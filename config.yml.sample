@@ -1,0 +1,4 @@
+aws:
+  key_id: 'YOUR_AWS_KEY_ID'
+  secret: 'YOUR_AWS_KEY_SECRET'
+  region: 'us-west-2'
