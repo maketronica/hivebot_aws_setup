@@ -208,3 +208,8 @@ api_client.put_method_response(
     'application/json': 'Empty'
   }
 )
+
+api_client.create_deployment(
+  rest_api_id: rest_api.id,
+  stage_name: 'prod'
+)
