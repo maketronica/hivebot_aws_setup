@@ -11,7 +11,7 @@ Aws.config.update({
 
 dynamodb = Aws::DynamoDB::Client.new(region: config['aws']['region'])
 
-resp = dynamodb.create_table({
+datapoints_table = dynamodb.create_table({
   table_name: 'beta_hivebot_datapoints',
   attribute_definitions: [
     {
@@ -36,8 +36,12 @@ resp = dynamodb.create_table({
   provisioned_throughput: {
     read_capacity_units: 1,
     write_capacity_units: 1,
+  },
+  stream_specification: {
+    stream_enabled: true,
+    stream_view_type: "NEW_AND_OLD_IMAGES"
   }
-})
+}).table_description
 
 iam_client = Aws::IAM::Client.new(region: 'us-west-2')
 
@@ -124,6 +128,10 @@ lambda_exec_role = iam_client.get_role(
   role_name: 'BetaManualLambdaExecRole'
 ).role
 
+lambda_dynamo_stream_reader_role = iam_client.get_role(
+  role_name: 'LambdaDynamoStreamReader'
+).role
+
 iam_client.attach_role_policy(
   role_name: lambda_invoke_role.role_name,
   policy_arn: lambda_invoke_policy.arn
@@ -134,15 +142,39 @@ iam_client.attach_role_policy(
   policy_arn: lambda_exec_policy.arn
 )
 
+lambda_client = Aws::Lambda::Client.new(region: config['aws']['region'])
+
+aggregator_zip = Zip::OutputStream.write_buffer do |zio|
+  zio.put_next_entry('index.js')
+  zio.write(File.open('datapoint_aggregator.js', 'rb').read)
+end
+
 lambda_zip = Zip::OutputStream.write_buffer do |zio|
   zio.put_next_entry('index.js')
   zio.write(File.open('hello_world.js', 'rb').read)
 end
 
-lambda_client = Aws::Lambda::Client.new(region: config['aws']['region'])
+functions = lambda_client.list_functions().functions
 
-response = lambda_client.list_functions()
-if (response.functions.any? {|function| function.function_name == 'BetaHelloWorld' }) then
+if (functions.any? {|function| function.function_name == 'BetaHivebotDatapointAggregator' }) then
+  lambda_client.update_function_code({
+    function_name: 'BetaHivebotDatapointAggregator',
+    zip_file: aggregator_zip.string
+  })
+else
+  sleep 5; #wait for role to propogate
+  lambda_client.create_function({
+    function_name: 'BetaHivebotDatapointAggregator',
+    runtime: 'nodejs',
+    handler: 'index.handler',
+    role: lambda_dynamo_stream_reader_role.arn,
+    code: {
+      zip_file: aggregator_zip.string
+    }
+  })
+end
+
+if (functions.any? {|function| function.function_name == 'BetaHelloWorld' }) then
   lambda_client.update_function_code({
     function_name: 'BetaHelloWorld',
     zip_file: lambda_zip.string
@@ -159,6 +191,12 @@ else
     }
   })
 end
+
+lambda_client.create_event_source_mapping(
+  event_source_arn: datapoints_table.latest_stream_arn,
+  function_name: 'BetaHivebotDatapointAggregator',
+  starting_position: "TRIM_HORIZON"
+)
 
 api_client = Aws::APIGateway::Client.new(region: config['aws']['region'])
 

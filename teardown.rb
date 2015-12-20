@@ -64,6 +64,13 @@ begin
 rescue
 end
 
+begin
+  lambda_client.delete_function(
+    function_name: 'BetaHivebotDatapointAggregator'
+  )
+rescue
+end
+
 
 api_client = Aws::APIGateway::Client.new(region: config['aws']['region'])
 
