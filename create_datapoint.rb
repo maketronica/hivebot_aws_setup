@@ -12,7 +12,7 @@ dynamodb = Aws::DynamoDB::Client.new(region: config['aws']['region'])
 
 resp = dynamodb.put_item({
   table_name: 'beta_hivebot_datapoints',
-  item: { hive_id: 1, created_at: Time.now.to_i, outside_temp: rand(100) }
+  item: { hive_id: 1, measured_at: Time.now.to_i, outside_temp: rand(100) }
 })
 
 puts resp.inspect

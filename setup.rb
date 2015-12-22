@@ -14,29 +14,31 @@ dynamodb = Aws::DynamoDB::Client.new(region: config['aws']['region'])
 datapoints_table = dynamodb.create_table({
   table_name: 'beta_hivebot_datapoints',
   attribute_definitions: [
-    {
-      attribute_name: 'hive_id',
-      attribute_type: 'N'
-    },
-    {
-      attribute_name: 'created_at',
-      attribute_type: 'N'
-    }
+    { attribute_name: 'hive_id', attribute_type: 'N' },
+    { attribute_name: 'measured_at', attribute_type: 'N' }
   ],
   key_schema: [
-    {
-      attribute_name: 'hive_id',
-      key_type: 'HASH'
-    },
-    {
-      attribute_name: 'created_at',
-      key_type: 'RANGE'
-    }
+    { attribute_name: 'hive_id', key_type: 'HASH' },
+    { attribute_name: 'measured_at', key_type: 'RANGE' }
   ],
-  provisioned_throughput: {
-    read_capacity_units: 1,
-    write_capacity_units: 1,
-  },
+  provisioned_throughput: { read_capacity_units: 1, write_capacity_units: 1, },
+  stream_specification: {
+    stream_enabled: true,
+    stream_view_type: "NEW_AND_OLD_IMAGES"
+  }
+}).table_description
+
+hourly_aggregates_table = dynamodb.create_table({
+  table_name: 'beta_hivebot_aggregates',
+  attribute_definitions: [
+    { attribute_name: 'hive_id_span', attribute_type: 'S' },
+    { attribute_name: 'beepoch_hour', attribute_type: 'N' },
+  ],
+  key_schema: [
+    { attribute_name: 'hive_id_span', key_type: 'HASH' },
+    { attribute_name: 'beepoch_hour', key_type: 'RANGE' }
+  ],
+  provisioned_throughput: { read_capacity_units: 1, write_capacity_units: 1, },
   stream_specification: {
     stream_enabled: true,
     stream_view_type: "NEW_AND_OLD_IMAGES"

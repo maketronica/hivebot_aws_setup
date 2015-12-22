@@ -14,6 +14,11 @@ begin
 rescue
 end
 
+begin
+  dynamodb.delete_table({ table_name: 'beta_hivebot_aggregates' })
+rescue
+end
+
 iam_client = Aws::IAM::Client.new(region: 'us-west-2')
 
 response = iam_client.list_policies(scope: 'All')
