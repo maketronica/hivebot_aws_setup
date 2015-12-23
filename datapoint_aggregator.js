@@ -40,24 +40,7 @@ function updateAggregate(span, datapoint, context) {
       } else {
         item = data.Item || {};
         dynamodb_client.updateItem(
-          {
-            TableName: 'beta_hivebot_aggregates',
-            Key: record_key,
-            UpdateExpression: 'SET first_measurement_at = :first_measurement_at, \
-                                   last_measurement_at = :last_measurement_at, \
-                                   max_outside_temp = :max_outside_temp, \
-                                   min_outside_temp = :min_outside_temp \
-                               ADD datapoints_count :one, \
-                                   total_of_all_outside_temps :outside_temp',
-            ExpressionAttributeValues: {
-              ":first_measurement_at": { N: (item.first_measurement_at || datapoint.measured_at).N },
-              ":last_measurement_at": { N: datapoint.measured_at.N },
-              ":max_outside_temp": { N: Math.max((item.max_outside_temp || { N: -999 }).N, datapoint.outside_temp.N).toString() },
-              ":min_outside_temp": { N: Math.min((item.min_outside_temp || { N: 999 }).N, datapoint.outside_temp.N).toString() },
-              ":one": { N: '1' },
-              ":outside_temp": { N: datapoint.outside_temp.N }
-            }
-          },
+          updateItemParams(datapoint, record_key),
           function(err, data) {
             if (err) {
               console.log("Aggregator Update Error: %j", err.stack);
@@ -69,6 +52,27 @@ function updateAggregate(span, datapoint, context) {
       }
     }
   );
+}
+
+function updateItemParams(datapoint, record_key) {
+  return {
+    TableName: 'beta_hivebot_aggregates',
+    Key: record_key,
+    UpdateExpression: 'SET first_measurement_at = :first_measurement_at, \
+                           last_measurement_at = :last_measurement_at, \
+                           max_outside_temp = :max_outside_temp, \
+                           min_outside_temp = :min_outside_temp \
+                       ADD datapoints_count :one, \
+                           total_of_all_outside_temps :outside_temp',
+    ExpressionAttributeValues: {
+      ":first_measurement_at": { N: (item.first_measurement_at || datapoint.measured_at).N },
+      ":last_measurement_at": { N: datapoint.measured_at.N },
+      ":max_outside_temp": { N: Math.max((item.max_outside_temp || { N: -999 }).N, datapoint.outside_temp.N).toString() },
+      ":min_outside_temp": { N: Math.min((item.min_outside_temp || { N: 999 }).N, datapoint.outside_temp.N).toString() },
+      ":one": { N: '1' },
+      ":outside_temp": { N: datapoint.outside_temp.N }
+    }
+  }
 }
 
 function updateNextAggregateSpan(span, datapoint, context) {
