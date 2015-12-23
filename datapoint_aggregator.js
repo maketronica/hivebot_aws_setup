@@ -4,10 +4,12 @@ var AWS = require("aws-sdk");
 var dynamodb_client = new AWS.DynamoDB({apiVersion: '2012-08-10'}); 
 
 var beepoch = new Date(2016,0,1);
+var beepoch_memo = {};
 
 exports.handler = function(event, context) {
     console.log('Received event:', JSON.stringify(event, null, 2));
     event.Records.forEach(function(record) {
+        beepoch_memo = {};
         console.log(record.eventID);
         console.log(record.eventName);
         console.log('DynamoDB Record: %j', record.dynamodb);
@@ -21,21 +23,10 @@ exports.handler = function(event, context) {
 };
 
 function updateHourlyAggregate(datapoint, context) {
-  var measurement_time = new Date(datapoint.measured_at.N*1000);
-  var beepoch_second = measurement_time.getTime()/1000 - beepoch.getTime()/1000;
-  var beepoch_hour = Math.floor(beepoch_second/3600);
-  var beepoch_day = Math.floor(beepoch_hour/24);
-  var beepoch_week = Math.floor(beepoch_day/7);
-
-  var beepoch_year = measurement_time.getFullYear() - 2016; 
-  var beepoch_month = (beepoch_year*12)+measurement_time.getMonth();
-
   var record_key = {
     "hive_id_span": { S: datapoint.hive_id.N + 'h' },
-    "beepoch_hour": { N: beepoch_hour.toString() }
+    "beepoch_hour": { N: getBeepoch('hour', datapoint).toString() }
   };
-
-  console.log("Initializing Aggregate: " + datapoint.hive_id.N + "/" + beepoch_hour);
 
   dynamodb_client.getItem(
     {
@@ -76,4 +67,51 @@ function updateHourlyAggregate(datapoint, context) {
       }
     }
   );
+}
+
+function getBeepoch(span, datapoint) {
+  switch(span) {
+    case 'second':
+      return getBeepochSecond(datapoint);
+    case 'hour':
+      return getBeepochHour(datapoint);
+    case 'day':
+      return getBeepochDay(datapoint);
+    case 'week':
+      return getBeepochWeek(datapoint);
+    case 'month':
+      return getBeepochMonth(datapoint);
+    case 'year':
+      return getBeepochYear(datapoint);
+  }
+}
+
+function getBeepochSecond(datapoint) {
+  return beepoch_memo['second'] |= datapoint.measured_at.N - beepoch.getTime()/1000;
+}
+
+function getBeepochHour(datapoint) {
+  return beepoch_memo['hour'] |= Math.floor(getBeepochSecond(datapoint)/3600);
+}
+
+function getBeepochDay(datapoint) {
+  return beepoch_memo['day'] |= Math.floor(getBeepochHour(datapoint)/24);
+}
+
+function getBeepochWeek(datapoint) {
+  return beepoch_memo['week'] |= Math.floor(getBeepochDay(datapoint)/7);
+}
+
+function getBeepochMonth(datapoint) {
+  return beepoch_memo['month'] |=
+    (getBeepochYear(datapoint)*12)+getBeepochMeasurementTime(datapoint).getMonth();
+}
+
+function getBeepochYear(datapoint) {
+  return beepoch_memo['year'] |=
+    getBeepochMeasurementTime(datapoint).getFullYear() - 2016; 
+}
+
+function getBeepochMeasurementTime(datapoint) {
+  return beepoch_memo['measurement_time'] |= new Date(datapoint.measured_at.N*1000);
 }
