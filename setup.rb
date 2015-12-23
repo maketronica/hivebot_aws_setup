@@ -32,11 +32,11 @@ hourly_aggregates_table = dynamodb.create_table({
   table_name: 'beta_hivebot_aggregates',
   attribute_definitions: [
     { attribute_name: 'hive_id_span', attribute_type: 'S' },
-    { attribute_name: 'beepoch_hour', attribute_type: 'N' },
+    { attribute_name: 'beepoch_id', attribute_type: 'N' },
   ],
   key_schema: [
     { attribute_name: 'hive_id_span', key_type: 'HASH' },
-    { attribute_name: 'beepoch_hour', key_type: 'RANGE' }
+    { attribute_name: 'beepoch_id', key_type: 'RANGE' }
   ],
   provisioned_throughput: { read_capacity_units: 1, write_capacity_units: 1, },
   stream_specification: {

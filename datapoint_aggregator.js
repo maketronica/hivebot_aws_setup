@@ -15,17 +15,18 @@ exports.handler = function(event, context) {
         console.log('DynamoDB Record: %j', record.dynamodb);
         
         var datapoint = record.dynamodb.NewImage;
+        datapoint.measured_date = new Date(datapoint.measured_at.N*1000);
 
-        updateHourlyAggregate(datapoint, context);
+        updateAggregate('month', datapoint, context);
 
         console.log("Record Loop Complete");
     });
 };
 
-function updateHourlyAggregate(datapoint, context) {
+function updateAggregate(span, datapoint, context) {
   var record_key = {
-    "hive_id_span": { S: datapoint.hive_id.N + 'h' },
-    "beepoch_hour": { N: getBeepoch('hour', datapoint).toString() }
+    "hive_id_span": { S: datapoint.hive_id.N + span[0] },
+    "beepoch_id": { N: getBeepoch(span, datapoint).toString() }
   };
 
   dynamodb_client.getItem(
@@ -35,20 +36,22 @@ function updateHourlyAggregate(datapoint, context) {
     },
     function(err, data) {
       if (err) {
-        console.log("Aggregator Init Error: %j", err.stack);
+        console.log("Aggregator Get Error: %j", err.stack);
       } else {
         item = data.Item || {};
         dynamodb_client.updateItem(
           {
             TableName: 'beta_hivebot_aggregates',
             Key: record_key,
-            UpdateExpression: 'SET last_updated_at = :last_datapoint_measured_at, \
+            UpdateExpression: 'SET first_measurement_at = :first_measurement_at, \
+                                   last_measurement_at = :last_measurement_at, \
                                    max_outside_temp = :max_outside_temp, \
                                    min_outside_temp = :min_outside_temp \
                                ADD datapoints_count :one, \
                                    total_of_all_outside_temps :outside_temp',
             ExpressionAttributeValues: {
-              ":last_datapoint_measured_at": { N: datapoint.measured_at.N },
+              ":first_measurement_at": { N: (item.first_measurement_at || datapoint.measured_at).N },
+              ":last_measurement_at": { N: datapoint.measured_at.N },
               ":max_outside_temp": { N: Math.max((item.max_outside_temp || { N: -999 }).N, datapoint.outside_temp.N).toString() },
               ":min_outside_temp": { N: Math.min((item.min_outside_temp || { N: 999 }).N, datapoint.outside_temp.N).toString() },
               ":one": { N: '1' },
@@ -57,16 +60,32 @@ function updateHourlyAggregate(datapoint, context) {
           },
           function(err, data) {
             if (err) {
-              console.log("Aggregator Init Error: %j", err.stack);
+              console.log("Aggregator Update Error: %j", err.stack);
             } else {
-              console.log("Aggregator Init Succ: %j", data);
-              context.succeed("context succeed");
+              updateNextAggregateSpan(span, datapoint, context);
             }  
           }
         );
       }
     }
   );
+}
+
+function updateNextAggregateSpan(span, datapoint, context) {
+  switch(span) {
+    case 'month':
+      updateAggregate('week', datapoint, context);
+      break;
+    case 'week':
+      updateAggregate('day', datapoint, context);
+      break;
+    case 'day':
+      updateAggregate('hour', datapoint, context);
+      break;
+    case 'hour':
+      context.succeed("context succeed");
+      break;
+  }
 }
 
 function getBeepoch(span, datapoint) {
@@ -104,14 +123,10 @@ function getBeepochWeek(datapoint) {
 
 function getBeepochMonth(datapoint) {
   return beepoch_memo['month'] |=
-    (getBeepochYear(datapoint)*12)+getBeepochMeasurementTime(datapoint).getMonth();
+    (getBeepochYear(datapoint)*12)+datapoint.measured_date.getMonth();
 }
 
 function getBeepochYear(datapoint) {
   return beepoch_memo['year'] |=
-    getBeepochMeasurementTime(datapoint).getFullYear() - 2016; 
-}
-
-function getBeepochMeasurementTime(datapoint) {
-  return beepoch_memo['measurement_time'] |= new Date(datapoint.measured_at.N*1000);
+    datapoint.measured_date.getFullYear() - 2016; 
 }
